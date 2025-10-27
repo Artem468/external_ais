@@ -81,21 +81,29 @@ class CreateUser(graphene.Mutation):
     class Arguments:
         username = graphene.String(required=True)
         password = graphene.String(required=True)
+        email = graphene.String(required=True)
+        first_name = graphene.String(required=False)
+        last_name = graphene.String(required=False)
         params = GenericScalar(required=False)
         max_daily_requests = graphene.Int(required=False)
 
     user = graphene.Field(UserType)
 
-    def mutate(self, info, username, password, params=None, max_daily_requests=None):
+    def mutate(
+            self, info, username, password, email, first_name=None,
+            last_name=None, params=None, max_daily_requests=None,
+    ):
         user = User(
             username=username,
+            email=email,
+            first_name=first_name or "",
+            last_name=last_name or "",
             params=params or {},
             max_daily_requests=max_daily_requests,
         )
         user.set_password(password)
         user.save()
         return CreateUser(user=user)
-
 
 class UpdateUser(graphene.Mutation):
     class Arguments:
@@ -114,7 +122,6 @@ class UpdateUser(graphene.Mutation):
         user.save()
         return UpdateUser(user=user)
 
-
 class CreateRequest(graphene.Mutation):
     class Arguments:
         user_id = graphene.Int(required=False)
@@ -129,7 +136,6 @@ class CreateRequest(graphene.Mutation):
             user_id=user_id, params=params or {}, text=text or "", status=status
         )
         return CreateRequest(request=req)
-
 
 class UpdateRequest(graphene.Mutation):
     class Arguments:
@@ -148,7 +154,6 @@ class UpdateRequest(graphene.Mutation):
         req.save()
         return UpdateRequest(request=req)
 
-
 class DeleteRequest(graphene.Mutation):
     class Arguments:
         id = graphene.ID(required=True)
@@ -159,13 +164,11 @@ class DeleteRequest(graphene.Mutation):
         Request.objects.filter(id=id).delete()
         return DeleteRequest(ok=True)
 
-
 class Mutation(graphene.ObjectType):
     create_user = CreateUser.Field()
     update_user = UpdateUser.Field()
     create_request = CreateRequest.Field()
     update_request = UpdateRequest.Field()
     delete_request = DeleteRequest.Field()
-
 
 schema = graphene.Schema(query=Query, mutation=Mutation)
