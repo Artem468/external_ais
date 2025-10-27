@@ -1,0 +1,52 @@
+services:
+  aisdb:
+    image: postgres:15
+    env_file: .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+
+  aisdjango:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: external_ais_back
+    env_file: .env
+    depends_on:
+      - aisdb
+    volumes:
+      - .:/app
+    working_dir: /app/
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py initadmin &&
+             python manage.py collectstatic --noinput --clear &&
+             python manage.py runserver 0.0.0.0:8000"
+    expose:
+      - "8000"
+    networks:
+      - backend
+
+  nginx:
+    image: nginx:1.28
+    container_name: ais_nginx
+    depends_on:
+      - aisdjango
+    ports:
+      - "6426:6426"
+    volumes:
+      - ./nginx/nginxdev.conf:/etc/nginx/nginx.conf:ro
+      - ./external_ais/static:/static
+      - ./external_ais/media:/media
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+
+networks:
+  backend:
+    driver: bridge
