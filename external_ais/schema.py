@@ -10,10 +10,14 @@ from core.models import User, Request
 
 class UserType(DjangoObjectType):
     params = GenericScalar()
+    request_count = graphene.Field(graphene.Int, status=graphene.String(required=True), created_at=graphene.DateTime(required=True))
 
     class Meta:
         model = User
         fields = "__all__"
+
+    def resolve_request_count(self, info, status, created_at):
+        return self.request_set.filter(status=status, created_at__lte=created_at).count()
 
 
 class RequestType(DjangoObjectType):
@@ -105,6 +109,7 @@ class CreateUser(graphene.Mutation):
         user.save()
         return CreateUser(user=user)
 
+
 class UpdateUser(graphene.Mutation):
     class Arguments:
         id = graphene.ID(required=True)
@@ -122,6 +127,7 @@ class UpdateUser(graphene.Mutation):
         user.save()
         return UpdateUser(user=user)
 
+
 class CreateRequest(graphene.Mutation):
     class Arguments:
         user_id = graphene.Int(required=False)
@@ -137,22 +143,30 @@ class CreateRequest(graphene.Mutation):
         )
         return CreateRequest(request=req)
 
+
 class UpdateRequest(graphene.Mutation):
     class Arguments:
         id = graphene.ID(required=True)
+        parent_id = graphene.Int(required=False)
+        user_id = graphene.Int(required=False)
         params = GenericScalar(required=False)
         status = graphene.String(required=False)
 
     request = graphene.Field(RequestType)
 
-    def mutate(self, info, id, params=None, status=None):
+    def mutate(self, info, id, user_id=None, parent_id=None, params=None, status=None):
         req = Request.objects.get(id=id)
+        if user_id is not None:
+            req.user_id = user_id
+        if parent_id is not None:
+            req.parent_id = parent_id
         if params is not None:
             req.params = params
         if status is not None:
             req.status = status
         req.save()
         return UpdateRequest(request=req)
+
 
 class DeleteRequest(graphene.Mutation):
     class Arguments:
@@ -164,11 +178,13 @@ class DeleteRequest(graphene.Mutation):
         Request.objects.filter(id=id).delete()
         return DeleteRequest(ok=True)
 
+
 class Mutation(graphene.ObjectType):
     create_user = CreateUser.Field()
     update_user = UpdateUser.Field()
     create_request = CreateRequest.Field()
     update_request = UpdateRequest.Field()
     delete_request = DeleteRequest.Field()
+
 
 schema = graphene.Schema(query=Query, mutation=Mutation)
